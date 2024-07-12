@@ -36,12 +36,12 @@ In this chapter, you will visit a very simple code example to be familiar with S
 
 In this chapter, you get familiar with some basic but useful methods in Soot to help read, analyze, and even update java code.
 
-* `./gradlew run --args="BasicAPI"`: Analyze the class [Circle](demo/BasicAPI/Circle.java).
-* `./gradlew run --args="BasicAPI draw"`: Analyze the class [Circle](demo/BasicAPI/Circle.java) and draws the call graph.
+* `./gradlew run --args="BasicAPI"`: Analyze the class [Circle](demo/Circle/Circle.java).
+* `./gradlew run --args="BasicAPI draw"`: Analyze the class [Circle](demo/Circle/Circle.java) and draws the call graph.
 
 |Title |Tutorial | Soot Code        | Example Input  |
 | :---: |:-------------: |:-------------:| :-----:|
-|Basic API |[Doc](https://medium.com/@noidsirius/know-the-basic-tools-in-soot-18f394318a9c)| [BasicAPI.java](src/main/java/dev/navids/soottutorial/basicapi/BasicAPI.java) | [Circle](demo/BasicAPI/Circle.java) |
+|Basic API |[Doc](https://medium.com/@noidsirius/know-the-basic-tools-in-soot-18f394318a9c)| [BasicAPI.java](src/main/java/dev/navids/soottutorial/basicapi/BasicAPI.java) | [Circle](demo/Circle/Circle.java) |
 
 
 <img src="docs/2/images/callgraph.png" alt="Call Graph" width="400"/>
