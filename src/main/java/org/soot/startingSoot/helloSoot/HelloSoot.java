@@ -1,18 +1,19 @@
 package org.soot.startingSoot.helloSoot;
 
-
 import soot.*;
-import soot.jimple.JimpleBody;
-import soot.jimple.Stmt;
+import soot.jimple.*;
 import soot.options.Options;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 public class HelloSoot {
 
     public static String sourceDirectory = System.getProperty("user.dir") + File.separator + "demo" + File.separator + "Circle";
     public static String circleClassName = "Circle";
+    public static int gotoCounter = 0;
 
     public static void setupSoot() {
         G.reset();
@@ -27,18 +28,14 @@ public class HelloSoot {
     }
 
     public static void main(String[] args) {
-        setupSoot();
-        SootClass circleClass = reportSootClassInfo();
-        SootMethod areaMethod = reportSootMethodInfo(circleClass);
-        JimpleBody body = (JimpleBody) areaMethod.getActiveBody();
-        int c = 0;
-        for (Unit u : body.getUnits()) {
-            c++;
-            Stmt stmt = (Stmt) u;
-            System.out.println(String.format("(%d): %s", c, stmt));
-        }
-        for (Trap trap : body.getTraps()) {
-            System.out.println(trap);
+        try {
+            setupSoot();
+            SootClass circleClass = reportSootClassInfo();
+            gotoStatementsCollector(circleClass);
+            System.out.println("The number of goto statements = " + gotoCounter);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(1); // Exit with error code 1
         }
     }
 
@@ -47,13 +44,25 @@ public class HelloSoot {
         return circleClass;
     }
 
-    private static SootMethod reportSootMethodInfo(SootClass circleClass) {
-        System.out.println("-----sootMethod-----");
-        System.out.println(String.format("List of %s's methods:", circleClass.getName()));
-        for (SootMethod sootMethod : circleClass.getMethods())
-            System.out.println(String.format("- %s", sootMethod.getName()));
-        SootMethod getCircleCountMethod = circleClass.getMethod("int getCircleCount()");
-        System.out.println(String.format("Method Name: %s", getCircleCountMethod.getName()));
-        return circleClass.getMethod("int area(boolean)");
+    private static void gotoStatementsCollector(SootClass circleClass) {
+        try {
+            for (SootMethod method : circleClass.getMethods()) {
+                if (method.isConcrete()) {
+                    JimpleBody body = (JimpleBody) method.retrieveActiveBody();
+                    PatchingChain<Unit> units = body.getUnits();
+
+                    // Collect GotoStmt units to avoid concurrent modification
+                    List<GotoStmt> gotoStmts = new ArrayList<>();
+                    for (Unit unit : units) {
+                        if (unit instanceof GotoStmt) {
+                            gotoStmts.add((GotoStmt) unit);
+                            gotoCounter++;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
