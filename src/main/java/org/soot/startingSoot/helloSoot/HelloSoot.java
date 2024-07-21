@@ -13,7 +13,8 @@ public class HelloSoot {
 
     public static String sourceDirectory = System.getProperty("user.dir") + File.separator + "demo" + File.separator + "Circle";
     public static String circleClassName = "Circle";
-    public static int gotoCounter = 0;
+
+    public static int counter = 0;
 
     public static void setupSoot() {
         G.reset();
@@ -31,8 +32,8 @@ public class HelloSoot {
         try {
             setupSoot();
             SootClass circleClass = reportSootClassInfo();
-            gotoStatementsCollector(circleClass);
-            System.out.println("The number of goto statements = " + gotoCounter);
+            instrumentGotoStatements(circleClass);
+            System.out.println("Number of gotos in execution:" + counter);
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(1); // Exit with error code 1
@@ -44,8 +45,11 @@ public class HelloSoot {
         return circleClass;
     }
 
-    private static void gotoStatementsCollector(SootClass circleClass) {
+    private static void instrumentGotoStatements(SootClass circleClass) {
         try {
+            SootField gotoCounterField = new SootField("gotoCounter", IntType.v(), Modifier.PUBLIC | Modifier.STATIC);
+            circleClass.addField(gotoCounterField);
+
             for (SootMethod method : circleClass.getMethods()) {
                 if (method.isConcrete()) {
                     JimpleBody body = (JimpleBody) method.retrieveActiveBody();
@@ -56,7 +60,25 @@ public class HelloSoot {
                     for (Unit unit : units) {
                         if (unit instanceof GotoStmt) {
                             gotoStmts.add((GotoStmt) unit);
-                            gotoCounter++;
+                        }
+                    }
+
+                    for (GotoStmt stmt : gotoStmts) {
+                        SootFieldRef gotoCounterFieldRef = gotoCounterField.makeRef();
+                        Local tmpLocal = Jimple.v().newLocal("tmpCounter", IntType.v());
+                        body.getLocals().add(tmpLocal);
+
+                        AssignStmt readCounter = Jimple.v().newAssignStmt(tmpLocal, Jimple.v().newStaticFieldRef(gotoCounterFieldRef));
+                        AssignStmt incrementCounter = Jimple.v().newAssignStmt(tmpLocal, Jimple.v().newAddExpr(tmpLocal, IntConstant.v(1)));
+                        AssignStmt writeCounter = Jimple.v().newAssignStmt(Jimple.v().newStaticFieldRef(gotoCounterFieldRef), tmpLocal);
+
+                        units.insertBefore(readCounter, stmt);
+                        units.insertBefore(incrementCounter, stmt);
+                        units.insertBefore(writeCounter, stmt);
+                        for (Unit x : units) {
+                            if (x instanceof GotoStmt) {
+                                counter++;
+                            }
                         }
                     }
                 }
