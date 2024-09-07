@@ -15,6 +15,7 @@ public class HelloSoot {
     public static String circleClassName = "Circle";
 
     public static int counter = 0;
+    public static int dynamicCounter = 0;
 
     public static void setupSoot() {
         G.reset();
@@ -32,8 +33,14 @@ public class HelloSoot {
         try {
             setupSoot();
             SootClass circleClass = reportSootClassInfo();
-            instrumentGotoStatements(circleClass);
+
+            /* we can change the second input of this method to count any kind of Jimple stmts for example instead of
+            GotoStmt.class just put IfStmt.class */
+            instrumentGotoStatements(circleClass, GotoStmt.class);
+
+
             System.out.println("Number of gotos in execution:" + counter);
+            System.out.println("Number of dynamicCounter in execution:" + dynamicCounter);
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(1); // Exit with error code 1
@@ -45,7 +52,7 @@ public class HelloSoot {
         return circleClass;
     }
 
-    private static void instrumentGotoStatements(SootClass circleClass) {
+    private static void instrumentGotoStatements(SootClass circleClass, Class inputStmt) {
         try {
             SootField gotoCounterField = new SootField("gotoCounter", IntType.v(), Modifier.PUBLIC | Modifier.STATIC);
             circleClass.addField(gotoCounterField);
@@ -55,29 +62,32 @@ public class HelloSoot {
                     JimpleBody body = (JimpleBody) method.retrieveActiveBody();
                     PatchingChain<Unit> units = body.getUnits();
 
-                    // Collect GotoStmt units to avoid concurrent modification
                     List<GotoStmt> gotoStmts = new ArrayList<>();
+                    List<Unit> stmts = new ArrayList<>();
                     for (Unit unit : units) {
                         if (unit instanceof GotoStmt) {
                             gotoStmts.add((GotoStmt) unit);
                         }
+                        if (inputStmt.isInstance(unit)) {
+                            stmts.add(unit);
+                        }
                     }
-
+//this fragmentation of code is the previous one which only counts the gotoStatements
                     for (GotoStmt stmt : gotoStmts) {
-                        SootFieldRef gotoCounterFieldRef = gotoCounterField.makeRef();
-                        Local tmpLocal = Jimple.v().newLocal("tmpCounter", IntType.v());
-                        body.getLocals().add(tmpLocal);
-
-                        AssignStmt readCounter = Jimple.v().newAssignStmt(tmpLocal, Jimple.v().newStaticFieldRef(gotoCounterFieldRef));
-                        AssignStmt incrementCounter = Jimple.v().newAssignStmt(tmpLocal, Jimple.v().newAddExpr(tmpLocal, IntConstant.v(1)));
-                        AssignStmt writeCounter = Jimple.v().newAssignStmt(Jimple.v().newStaticFieldRef(gotoCounterFieldRef), tmpLocal);
-
-                        units.insertBefore(readCounter, stmt);
-                        units.insertBefore(incrementCounter, stmt);
-                        units.insertBefore(writeCounter, stmt);
+                        addStatements(gotoCounterField, body, units, stmt);
                         for (Unit x : units) {
                             if (x instanceof GotoStmt) {
                                 counter++;
+                            }
+                        }
+                    }
+/* this fragmentation of the code can count all the statements type like gotoStmts, ifStmts, returnVoidStmts, etc. dynamically
+by just adjusting the input of the method in main */
+                    for (Unit stmt : stmts) {
+                        addStatements(gotoCounterField, body, units, stmt);
+                        for (Unit x : units) {
+                            if (inputStmt.isInstance(x)) {
+                                dynamicCounter++;
                             }
                         }
                     }
@@ -86,5 +96,19 @@ public class HelloSoot {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private static void addStatements(SootField counterField, JimpleBody body, PatchingChain<Unit> units, Unit stmt) {
+        SootFieldRef gotoCounterFieldRef = counterField.makeRef();
+        Local tmpLocal = Jimple.v().newLocal("tmpCounter", IntType.v());
+        body.getLocals().add(tmpLocal);
+
+        AssignStmt readCounter = Jimple.v().newAssignStmt(tmpLocal, Jimple.v().newStaticFieldRef(gotoCounterFieldRef));
+        AssignStmt incrementCounter = Jimple.v().newAssignStmt(tmpLocal, Jimple.v().newAddExpr(tmpLocal, IntConstant.v(1)));
+        AssignStmt writeCounter = Jimple.v().newAssignStmt(Jimple.v().newStaticFieldRef(gotoCounterFieldRef), tmpLocal);
+
+        units.insertBefore(readCounter, stmt);
+        units.insertBefore(incrementCounter, stmt);
+        units.insertBefore(writeCounter, stmt);
     }
 }
